@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset=utf-8>
+		<title>Heart model</title>
+		<script src="three.js"></script>
+
+		<script src="models/aortha.js"></script>
+		<script src="models/heart.js"></script>
+		<script src="models/heart_arteries.js"></script>
+		<script src="models/heart_veins.js"></script>
+		<script src="models/left_atrium2.js"></script>
+		<script src="models/left_ventricle.js"></script>
+		<script src="models/pulmonary.js"></script>
+		<script src="models/right_atrium2.js"></script>
+		<script src="models/right_ventricle.js"></script>
+		<script src="models/tricuspid_valve.js"></script>
+		<script src="models/valve2.js"></script>
+
+		<script src="model.js"></script>
+
+		<script src="catmull-clark.js"></script>
+		<script src="TrackballControls.js"></script>
+		<script src="dat.gui.js"></script>
+		<script src="d3.js"></script>
+		<script src="mode.js"></script>
+		<script src="contour.js"></script>
+		<script src="parseArguments.js"></script>
+		<style>
+			body { margin: 0; }
+			canvas { width: 80%; height: 100%; }
+		</style>
+	</head>
+	<body>
+
+		<script>
+			var scene, camera, renderer;
+			var raycaster = new THREE.Raycaster();
+			var mouse = new THREE.Vector2();
+			var control;
+			var selected;
+			var intersect;
+			var planeVisible = false;
+			var planeMesh;
+			var allHide = false;
+			var contoursVisible = false;
+			var dot, dot1, dot2;
+			var dotVisible = false;
+			var interactiveMode = false;
+			var target;
+			var PT;
+			var dt = null;
+			var plane;
+			var TIME = 0;
+			var heartData = parseArgs(JSON.parse(text));
+			init();
+
+			function refreshScene() {
+				for (var i = 0; i < Models.length; ++i) {
+					if (Models[i].visible)
+						Models[i].refreshDisplay(scene);
+					else
+						Models[i].Hide(scene);
+				}
+			}
+
+			function whatIsIt(mesh) {
+				for (var i = 0; i < Models.length; ++i) {
+					if (Models[i].mesh == mesh)
+							return Models[i];
+				}
+				return null;
+			}
+
+			function hideAll() {
+				for (var i = 0; i < Models.length; ++i)
+				{
+					Models[i].visible = false;
+				}
+				refreshScene();
+			}
+
+			function showAll() {
+				for (var i = 0; i < Models.length; ++i)
+				{
+					Models[i].visible = true;
+				}
+				refreshScene();
+			}
+
+			function addContours() {
+				for(var i = 0; i < Models.length; ++i)
+				{
+					if (contoursVisible)
+					{
+						scene.remove(Models[i].contour);
+						//scene.remove(lv.contour);
+					}
+					else
+					{
+						scene.add(Models[i].contour);
+						//scene.add(lv.contour);
+					}
+
+				}
+				contoursVisible = (!contoursVisible);
+			}
+
+			function addPlane() {
+				if (planeVisible) {
+					scene.remove(planeMesh);
+					planeVisible = false;
+				}
+				else
+				{
+					scene.add(planeMesh);
+					planeVisible = true;
+				}
+			}
+
+			function onMouseMove( event ) {
+
+				mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+				mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+			}
+			function onMouseClick( event ) {
+				if (intersect != null) {
+					if (interactiveMode) {
+
+						selected = intersect;
+						//selected.current_color = [255, 255, 0];
+						//selected.mesh.material.color = new THREE.Color(selected.current_color);
+						var ColorObj = new THREE.Color(selected.current_color);
+						selected.setColor(ColorObj);
+						controls.scolor = "#" + ColorObj.getHexString();
+						controls.Name = selected.name;
+
+					} else {
+						//if (target > 0) {
+						if (PT != null) {
+							var dotMaterial = new THREE.PointsMaterial( { size: 10, sizeAttenuation: false } );
+
+							var dotGeometry = new THREE.Geometry();
+							dotGeometry.vertices.push(PT);
+							if (dt != null) {
+								scene.remove(dt);
+							}
+
+							dt = new THREE.Points(dotGeometry, dotMaterial);
+							scene.add(dt);
+							console.log(PT);
+							console.log(dt);
+							changeLine(PT);
+							//changeLine(PT);
+
+							/*
+							console.log(intersect.geometry.attributes.color.array[target * 3]);
+							intersect.geometry.attributes.color.array[target * 3] -= 50;
+							console.log(intersect.geometry.attributes.color.array[target * 3]);
+							intersect.geometry.attributes.color.array[target * 3 + 1] -= 50;
+							intersect.geometry.attributes.color.array[target * 3 + 2] -= 50;
+							intersect.geometry.attributes.color.needsUpdate = true;
+							*/
+						}
+					}
+
+				}
+			}
+			function onMouseDbClick( event ) {
+
+				if (selected != null)
+				{
+					if (controls.scolor == "#ffd700")
+					{
+						selected.current_color = selected.default_color
+					}
+				}
+				selected = null;
+				controls.Name = "Null";
+
+			}
+
+			function getChar(event) {
+				if (event.which == null) { // IE
+					if (event.keyCode < 32) return null; // спец. символ
+					return String.fromCharCode(event.keyCode)
+				}
+
+				if (event.which != 0 && event.charCode != 0) { // все кроме IE
+					if (event.which < 32) return null; // спец. символ
+					return String.fromCharCode(event.which); // остальные
+				}
+
+
+				return null; // спец. символ
+			}
+			
+			function onKeyDown(event) {
+				if (getChar(event) == 'h'){
+					if (selected != null) {
+						if (selected.visible)
+							selected.visible = false;
+						else
+							selected.visible = true;
+						refreshScene();
+					}
+				}
+				if (getChar(event) == 'p')
+				{
+					addPlane();
+				}
+				if (getChar(event) == 'c')
+				{
+					addContours();
+				}
+				if (getChar(event) == ' ')
+				{
+					if (allHide)
+					{
+						showAll();
+						allHide = false;
+					}
+					else
+					{
+						hideAll();
+						allHide = true;
+					}
+				}
+				if (getChar(event) == 'd')
+				{
+					if (dotVisible)
+					{
+						scene.remove(dot);
+						scene.remove(dot1);
+						scene.remove(dot2);
+						dotVisible = false;
+					}
+					else
+					{
+						scene.add(dot);
+						scene.add(dot1);
+						scene.add(dot2);
+						dotVisible = true;
+					}
+				}
+				if (getChar(event) == 'q')
+				{
+					interactiveMode = !(interactiveMode);
+				}
+
+			}
+
+			function init() {
+
+			    scene = new THREE.Scene();
+
+			    camera = new THREE.PerspectiveCamera( 75, (window.innerWidth) / (window.innerHeight), 0.01, 10000 );
+
+
+				var spotLight1 = new THREE.SpotLight(0xffffff, 0.75);
+				spotLight1.position.set( -2, 2, 0);
+				scene.add(spotLight1 );
+
+
+				var spotLight2 = new THREE.SpotLight(0xffffff, 0.75);
+
+				spotLight2.position.set(2, 2, 0);
+				scene.add(spotLight2 );
+
+
+				var spotLight3 = new THREE.SpotLight(0xffffff, 0.75);
+
+				spotLight3.position.set(0, -2, 2);
+				scene.add(spotLight3 );
+
+				var spotLight4 = new THREE.SpotLight(0xffffff, 0.75);
+
+				spotLight4.position.set(0, -2, -2);
+				scene.add(spotLight4 );
+
+
+				var ambientLight = new THREE.AmbientLight(0x505050);
+				scene.add(ambientLight);
+
+
+
+
+				for (var i = 0; i < Models.length; ++i) {
+					Models[i].initialize();
+
+				}
+
+				refreshScene();
+				var ind = lv.searchMinY();
+				tricuspid.setAvgh();
+				mitral.setAvgh();
+				var p1 = new THREE.Vector3(lv.currentMesh.points[ind], lv.currentMesh.points[ind + 1], lv.currentMesh.points[ind + 2]);
+				var p2 = new THREE.Vector3(tricuspid.avgh[0], tricuspid.avgh[1], tricuspid.avgh[2]);
+				var p3 = new THREE.Vector3(mitral.avgh[0], mitral.avgh[1], mitral.avgh[2]);
+				var p4 = new THREE.Vector3().subVectors(p3, p2);
+				var p5 = new THREE.Vector3().subVectors(p3, p1);
+
+				var p6 = new THREE.Vector3().crossVectors(p5, p4);
+				p6.normalize();
+				plane = new THREE.Plane(p6, 0.0);
+				plane.normal.normalize();
+				//console.log(p6.angleTo(p4));
+				//plane;
+
+				for (var i = 0; i < Models.length; ++i) {
+
+					if (Models[i] != heart_arteries && Models[i] != heart_veins) {
+						var p = new MODE.planeIntersect(Models[i].geo, plane);
+						var m = new THREE.LineBasicMaterial();
+						m.side = THREE.DoubleSide;
+
+						Models[i].contour = p.wireframe(m);
+						//scene.add(this.contour);
+						//console.log(Models[i].mesh.geometry);
+					}
+
+				}
+
+				renderer = new THREE.WebGLRenderer();
+
+
+				camera.position.z = 2;
+				camera.position.y = 0.7	;
+
+				camera.lookAt(scene.position);
+				renderer.setSize( window.innerWidth, window.innerHeight);
+
+			    document.body.appendChild( renderer.domElement );
+				control = new THREE.TrackballControls( camera, renderer.domElement );
+
+				control.rotateSpeed = 5.0;
+				control.zoomSpeed = 1.2;
+				control.panSpeed = 0.8;
+
+				control.noZoom = false;
+				control.noPan = false;
+
+				control.staticMoving = true;
+				control.dynamicDampingFactor = 0.3;
+
+				control.keys = [ 65, 83, 68 ];
+
+				control.addEventListener( 'change', render );
+
+
+				var dotGeometry1 = new THREE.Geometry();
+				dotGeometry1.vertices.push(p1);
+				var dotMaterial1 = new THREE.PointsMaterial( { size: 10, sizeAttenuation: false } );
+				dot1 = new THREE.Points( dotGeometry1, dotMaterial1 );
+				//scene.add( dot1 );
+
+				var dotGeometry = new THREE.Geometry();
+				dotGeometry.vertices.push(p2);
+				var dotMaterial = new THREE.PointsMaterial( { size: 10, sizeAttenuation: false } );
+				dot = new THREE.Points( dotGeometry, dotMaterial );
+				//scene.add( dot );
+
+				var dotGeometry2 = new THREE.Geometry();
+				dotGeometry2.vertices.push(p3);
+				var dotMaterial2 = new THREE.PointsMaterial( { size: 10, sizeAttenuation: false } );
+				dot2 = new THREE.Points( dotGeometry2, dotMaterial2 );
+				//scene.add( dot2 );
+
+
+				var planegeometry = new THREE.PlaneBufferGeometry(2, 2);
+
+				// Assumes that "plane" is the source THREE.Plane object.
+				// Normalize the plane
+				var normPlane = new THREE.Plane().copy(plane);
+				// Rotate from (0,0,1) to the plane's normal
+				var quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),normPlane.normal);
+				// Calculate the translation
+				var position = new THREE.Vector3(
+						-normPlane.constant*normPlane.normal.x,
+						-normPlane.constant*normPlane.normal.y,
+						-normPlane.constant*normPlane.normal.z);
+
+				var matrix = new THREE.Matrix4().compose(position,quaternion,new THREE.Vector3(1,1,1));
+
+				planegeometry.applyMatrix(matrix);
+
+				var mat = new THREE.MeshBasicMaterial();
+				mat.color = new THREE.Color("#C0C0C0");
+				mat.side = THREE.DoubleSide;
+				mat.opacity = 0.3;
+				mat.transparent = true;
+				planeMesh = new THREE.Mesh(planegeometry, mat);
+
+				planeMesh.translateOnAxis(p5.normalize(), 0.4);
+				planeMesh.translateOnAxis(p4.normalize(), -0.2);
+				test(scene);
+
+				addContours();
+				hideAll();
+				addPlane();
+
+			}
+
+			var controls = new function() {
+				this.Control_Mesh = function () {
+					for (var i = 0; i < Models.length; ++i) {
+						Models[i].returnToControlMesh();
+					}
+					refreshScene();
+				}
+				this.Subdivision_1 = function () {
+					for (var i = 0; i < Models.length; ++i) {
+						Models[i].updateSubdiv(1);
+					}
+					refreshScene();
+
+				}
+				this.Subdivision_2 = function () {
+					for (var i = 0; i < Models.length; ++i) {
+						Models[i].updateSubdiv(2);
+					}
+					refreshScene();
+				}
+				this.Without_Wireframe = function () {
+					for (var i = 0; i < Models.length; ++i) {
+						Models[i].wireframeMode = 0;
+					}
+					refreshScene();
+				}
+				this.With_Wireframe = function () {
+					for (var i = 0; i < Models.length; ++i) {
+						Models[i].wireframeMode = 1;
+					}
+					refreshScene();
+				}
+				this.Only_Wireframe = function () {
+					for (var i = 0; i < Models.length; ++i) {
+						Models[i].wireframeMode = 2;
+					}
+					refreshScene();
+				}
+				this.Heart = function () {
+					if (heart.visible)
+							heart.visible = false;
+					else
+							heart.visible = true;
+					refreshScene();
+				};
+				this.Left_Ventricle = function () {
+					if (lv.visible)
+						lv.visible = false;
+					else
+						lv.visible = true;
+					refreshScene();
+				}
+				this.Right_Ventricle = function () {
+					if (rv.visible)
+						rv.visible = false;
+					else
+						rv.visible = true;
+					refreshScene();
+				}
+				this.Mitral_Valve = function () {
+					if (mitral.visible)
+						mitral.visible = false;
+					else
+						mitral.visible = true;
+					refreshScene();
+				}
+				this.Tricuspid_Valve = function () {
+					if (tricuspid.visible)
+						tricuspid.visible = false;
+					else
+						tricuspid.visible = true;
+					refreshScene();
+				}
+				this.Heart_Arteries = function () {
+					if (heart_arteries.visible)
+						heart_arteries.visible = false;
+					else
+						heart_arteries.visible = true;
+					refreshScene();
+				}
+				this.Heart_Veins = function () {
+					if (heart_veins.visible)
+						heart_veins.visible = false;
+					else
+						heart_veins.visible = true;
+					refreshScene();
+				}
+				this.Left_Atrium = function () {
+					if (la.visible)
+						la.visible = false;
+					else
+						la.visible = true;
+					refreshScene();
+				}
+				this.Aortha = function () {
+					if (aortha.visible)
+						aortha.visible = false;
+					else
+						aortha.visible = true;
+					refreshScene();
+				}
+				this.Right_Atrium = function () {
+					if (ra.visible)
+						ra.visible = false;
+					else
+						ra.visible = true;
+					refreshScene();
+				}
+				this.Pulmonary_Artery = function () {
+					if (pulmonary.visible)
+						pulmonary.visible = false;
+					else
+						pulmonary.visible = true;
+					refreshScene();
+				}
+				this.scolor = "#1861b3";
+				this.Name = "Null";
+				this.Default_color = function () {
+					if (selected != null){
+						selected.current_color = selected.default_color;
+						this.scolor = selected.current_color;
+					}
+				}
+				this.Hide_Selected = function () {
+					if (selected != null) {
+						if (selected.visible)
+							selected.visible = false;
+						else
+							selected.visible = true;
+						refreshScene();
+					}
+				}
+				this.shininess = Models[0].mesh.material.shininess;
+				this.specular = "#" + Models[0].mesh.material.specular.getHexString();
+
+			};
+
+			var gui = new dat.GUI();
+			var f1 = gui.addFolder('Subdivisions');
+			f1.add(controls, 'Control_Mesh');
+			f1.add(controls, 'Subdivision_1');
+			f1.add(controls, 'Subdivision_2');
+			
+			var f2 = gui.addFolder('Wireframes');
+			f2.add(controls, 'Without_Wireframe');
+			f2.add(controls, 'With_Wireframe');
+			f2.add(controls, 'Only_Wireframe');
+
+			var f3 = gui.addFolder('Models');
+
+			f3.add(controls, 'Heart');
+			f3.add(controls, 'Left_Ventricle');
+			f3.add(controls, 'Left_Atrium');
+			f3.add(controls, 'Aortha');
+			f3.add(controls, 'Right_Ventricle');
+			f3.add(controls, 'Right_Atrium');
+			f3.add(controls, 'Pulmonary_Artery');
+			f3.add(controls, 'Mitral_Valve');
+			f3.add(controls, 'Tricuspid_Valve');
+			f3.add(controls, 'Heart_Arteries');
+			f3.add(controls, 'Heart_Veins');
+
+			var f4 = gui.addFolder('Selected');
+			f4.add(controls, 'Name').listen();
+			f4.addColor(controls, 'scolor').listen();
+			f4.add(controls, 'Default_color');
+			f4.add(controls, 'Hide_Selected');
+			f4.open();
+
+
+			var f5 = gui.addFolder('Shininess');
+			f5.add(controls, 'shininess', 0, 100).listen();
+			f5.addColor(controls, 'specular').listen();
+
+
+			function render() {
+
+				if (interactiveMode) {
+					if (Models[0].wireframeMode != 1) {
+						raycaster.setFromCamera(mouse, camera);
+						var intersects = raycaster.intersectObjects(scene.children);
+						if (selected != null) {
+							var colorObj = new THREE.Color(controls.scolor);
+							selected.current_color = colorObj;
+						}
+						if (intersects.length > 0) {
+							var temp = intersect;
+							intersect = whatIsIt(intersects[0].object);
+							if (intersect != null) {
+								if (intersect != temp) {
+									 var temp_color =  new THREE.Color(intersect.current_color);
+									 intersect.setColor(temp_color.addScalar(40.0 / 255.0));
+									if (temp != null)
+										//temp.mesh.material.color = new THREE.Color(temp.current_color);
+										temp.setColor(new THREE.Color(temp.current_color));
+								}
+							}
+						}
+						else {
+							intersect = null;
+						}
+
+						for (var i = 0; i < Models.length; i++) {
+							if (Models[i] != intersect) {
+								//Models[i].mesh.material.color = new THREE.Color(Models[i].current_color);
+								/*Models[i].mesh.geometry.attributes.color.array =
+										Models[i].getColorArray(new THREE.Color(Models[i].current_color));*/
+								Models[i].setColor(new THREE.Color(Models[i].current_color));
+								Models[i].mesh.material.shininess = controls.shininess;
+								Models[i].mesh.material.specular = new THREE.Color(controls.specular);
+								Models[i].mesh.material.needsUpdate = true;
+							}
+						}
+
+					}
+				} else {
+					raycaster.setFromCamera(mouse, camera);
+					var intersects = raycaster.intersectObjects(scene.children);
+					if (intersects.length > 0) {
+						for (var i = 0; i < intersects.length; ++i) {
+							if (intersects[i].object == planeMesh) {
+								intersect = planeMesh;
+								PT = intersects[i].point;
+								break;
+							}
+							else {
+
+								PT = null;
+							}
+						}
+
+						/*intersect = intersects[0].object;
+						var point = intersects[0].point;
+
+						var indices = intersects[0].face;
+						//console.log(indices);
+						var v1 = new THREE.Vector3(
+								intersect.geometry.attributes.position.array[indices.a * 3],
+								intersect.geometry.attributes.position.array[indices.a * 3 + 1],
+								intersect.geometry.attributes.position.array[indices.a * 3 + 2]);
+						var v2 = new THREE.Vector3(
+								intersect.geometry.attributes.position.array[indices.b * 3],
+								intersect.geometry.attributes.position.array[indices.b * 3 + 1],
+								intersect.geometry.attributes.position.array[indices.b * 3 + 2]);
+						var v3 = new THREE.Vector3(
+								intersect.geometry.attributes.position.array[indices.c * 3],
+								intersect.geometry.attributes.position.array[indices.c * 3 + 1],
+								intersect.geometry.attributes.position.array[indices.c * 3 + 2]);
+						//console.log(v1);
+						//v1.sub(point);
+						//console.log(v1);
+						var min = 1005000;
+						target = -1;
+						if (v1.sub(point).length() < min) {
+							min = v1.length();
+							target = indices.a;
+						}
+
+						if (v2.sub(point).length() < min) {
+							min = v2.length();
+							target = indices.b;
+						}
+
+						if (v3.sub(point).length() < min) {
+							min = v3.length();
+							target = indices.c;
+						}
+
+						console.log(min);*/
+
+					} else {
+						intersect = null;
+					}
+
+
+				}
+				if (TIME <= heartData[heartData.length - 1][1])
+				{
+					Heart_cycle(heartData, TIME);
+				}
+				else {TIME = 1}
+				renderer.render(scene, camera);
+			}
+
+			function animate() {
+
+			    requestAnimationFrame( animate );
+				control.update();
+				TIME += 0.01;
+
+			    render();
+
+			}
+			window.addEventListener( 'mousemove', onMouseMove, false );
+			window.addEventListener( 'click', onMouseClick, false );
+			window.addEventListener( 'dblclick', onMouseDbClick, false );
+			window.addEventListener( 'keypress', onKeyDown, false );
+
+			animate();
+
+		</script>
+
+
+	</body>
+</html>
