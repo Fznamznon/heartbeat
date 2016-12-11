@@ -46,13 +46,15 @@
 			var contoursVisible = false;
 			var dot, dot1, dot2;
 			var dotVisible = false;
-			var interactiveMode = false;
+			var interactiveMode = true;
 			var target;
 			var PT;
 			var dt = null;
 			var plane;
-			var TIME = 0;
-			var heartData = parseArgs(JSON.parse(text));
+			var TIME = 1;
+			var heartBeat = false;
+			var heartDataRecieved = false;
+
 			init();
 
 			function refreshScene() {
@@ -89,19 +91,31 @@
 			}
 
 			function addContours() {
-				for(var i = 0; i < Models.length; ++i)
+				for(var i = 0; i < Contours.length; ++i)
 				{
 					if (contoursVisible)
 					{
-						scene.remove(Models[i].contour);
+						scene.remove(Contours[i]);
 						//scene.remove(lv.contour);
 					}
 					else
 					{
-						scene.add(Models[i].contour);
+						scene.add(Contours[i]);
 						//scene.add(lv.contour);
 					}
 
+				}
+				for (var i = 0; i < Lines.length; ++i) {
+					if (contoursVisible)
+					{
+						Lines[i].rm(scene);
+						//scene.remove(lv.contour);
+					}
+					else
+					{
+						Lines[i].show(scene);
+						//scene.add(lv.contour);
+					}
 				}
 				contoursVisible = (!contoursVisible);
 			}
@@ -396,9 +410,9 @@
 				planeMesh.translateOnAxis(p4.normalize(), -0.2);
 				test(scene);
 
-				addContours();
-				hideAll();
-				addPlane();
+				//addContours();
+				//hideAll();
+				//addPlane();
 
 			}
 
@@ -534,6 +548,11 @@
 						refreshScene();
 					}
 				}
+				this.Start_HeartBeat = function() {
+					if (heartDataRecieved) {
+						heartBeat = !(heartBeat);
+					}
+				}
 				this.shininess = Models[0].mesh.material.shininess;
 				this.specular = "#" + Models[0].mesh.material.specular.getHexString();
 
@@ -576,6 +595,7 @@
 			f5.add(controls, 'shininess', 0, 100).listen();
 			f5.addColor(controls, 'specular').listen();
 
+			gui.add(controls, 'Start_HeartBeat');
 
 			function render() {
 
@@ -678,11 +698,14 @@
 
 
 				}
-				if (TIME <= heartData[heartData.length - 1][1])
-				{
-					Heart_cycle(heartData, TIME);
+				if (heartBeat) {
+					if (TIME <= heartData[heartData.length - 1][1]) {
+						Heart_cycle(heartData, TIME);
+					}
+					else {
+						TIME = 1
+					}
 				}
-				else {TIME = 1}
 				renderer.render(scene, camera);
 			}
 
@@ -690,8 +713,9 @@
 
 			    requestAnimationFrame( animate );
 				control.update();
-				TIME += 0.01;
-
+				if (heartBeat) {
+					TIME += 0.01;
+				}
 			    render();
 
 			}

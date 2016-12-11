@@ -10,6 +10,9 @@ function addDot(dot) {
     scene.add(d);
 }
 
+
+
+
 function getVertices(obj, start, stop, ind, f) {
     var lines = obj.children;
     var dots = [];
@@ -32,6 +35,19 @@ function getVertices(obj, start, stop, ind, f) {
 
 
 var Lines = [];
+var Contours = [];
+
+
+function getContour(dots) {
+    var geometry = new THREE.Geometry();
+    var vertices = geometry.vertices;
+    for (var i = 0; i < dots.length; ++i) {
+        vertices.push(dots[i]);
+    }
+    var material = new THREE.LineBasicMaterial();
+    material.side = THREE.doubleSided;
+    return new THREE.Line(geometry, material);
+}
 
 function Line(basis,  lineArrs)
 {
@@ -298,6 +314,52 @@ function test(scene) {
     lines = heart.contour.children;
     lines[0].material.color = new THREE.Color(0, 1, 0);
     var dots1 = getVertices(obj1, 52, 58, 0, false);
+
+    var temp = getVertices(obj1, 0, 52, 0, false);
+    Contours.push(getContour(temp));
+    var temp1 = getVertices(obj1, 91, 155, 0, false);
+    Contours.push(getContour(temp1));
+
+
+    for (var i = 1; i < lines.length; ++i) {
+        var temp2 = getVertices(obj1, 0, lines[i].geometry.vertices.length, i, false);
+        Contours.push(getContour(temp2));
+    }
+
+
+    var obj5 = la.contour;
+    //console.log(obj5);
+    lines = obj5.children;
+    for (var i = 0; i < lines.length; ++i) {
+        var temp3 = getVertices(obj5, 0, lines[i].geometry.vertices.length, i, false);
+        Contours.push(getContour(temp3));
+    }
+
+    var obj6 = ra.contour;
+    //console.log(obj6);
+    lines = obj6.children;
+    for (var i = 0; i < lines.length; ++i) {
+        var temp4 = getVertices(obj6, 0, lines[i].geometry.vertices.length, i, false);
+        Contours.push(getContour(temp4));
+    }
+
+    var obj7 = pulmonary.contour;
+    //console.log(obj6);
+    lines = obj7.children;
+    for (var i = 0; i < lines.length; ++i) {
+        var temp5 = getVertices(obj7, 0, lines[i].geometry.vertices.length, i, false);
+        Contours.push(getContour(temp5));
+    }
+
+    var obj8 = aortha.contour;
+    //console.log(obj6);
+    lines = obj8.children;
+    for (var i = 0; i < lines.length; ++i) {
+        var temp6 = getVertices(obj8, 0, lines[i].geometry.vertices.length, i, false);
+        Contours.push(getContour(temp6));
+    }
+
+    //var temp6 = getVertices(obj5, 0, lines[0].)
 
     C = dots1[5];
 
